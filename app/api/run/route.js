@@ -1,3 +1,4 @@
+import { parseJsonRequest, validateRequestBody, toSafeError } from "@/lib/production-guardrails";
 import { Agent, run } from "@openai/agents";
 
 export const runtime = "nodejs";
@@ -31,7 +32,12 @@ Production checklist:
 }
 
 export async function POST(request) {
-  const body = await request.json().catch(() => ({}));
+  const body = await parseJsonRequest(request);
+  const guardrail = validateRequestBody(body);
+  if (!guardrail.ok) {
+    return Response.json({ error: guardrail.error }, { status: guardrail.status });
+  }
+
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
 
   if (!prompt) {
@@ -74,7 +80,7 @@ Stay practical, concise, and production-minded.
     });
   } catch (error) {
     return Response.json(
-      { error: error.message || "Agent run failed." },
+      { error: toSafeError(error, "Agent run failed.") },
       { status: 500 },
     );
   }
